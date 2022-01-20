@@ -1,4 +1,4 @@
-###SpeedTest
+### SpeedTest
 
 Uses [Ookla](https://www.speedtest.net/) Speed test to measure network speed and pushes data to InfluxDB - for visualization or as source for e.g.Grafana.
 
