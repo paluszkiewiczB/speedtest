@@ -2,7 +2,7 @@ package inmemory
 
 import (
 	"context"
-	"speedtestMonitoring/core"
+	"github.com/paluszkiewiczB/speedtest/internal/core"
 )
 
 func NewStorage() core.Storage {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
-	"speedtestMonitoring/core"
+	"github.com/paluszkiewiczB/speedtest/internal/core"
 	"time"
 )
 

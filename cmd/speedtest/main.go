@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/gurkankaymak/hocon"
+	"github.com/paluszkiewiczB/speedtest/internal/core"
+	"github.com/paluszkiewiczB/speedtest/internal/influx"
+	"github.com/paluszkiewiczB/speedtest/internal/inmemory"
+	"github.com/paluszkiewiczB/speedtest/internal/schedule"
+	"github.com/paluszkiewiczB/speedtest/internal/speedtest"
 	"log"
-	"speedtestMonitoring/core"
-	"speedtestMonitoring/influx"
-	"speedtestMonitoring/inmemory"
-	"speedtestMonitoring/schedule"
-	"speedtestMonitoring/speedtest"
 	"time"
 )
 
