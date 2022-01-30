@@ -1,8 +1,12 @@
-module speedtestMonitoring
+module github.com/paluszkiewiczB/speedtest
 
 go 1.17
 
-require github.com/showwin/speedtest-go v1.1.4
+require (
+	github.com/gurkankaymak/hocon v1.2.3
+	github.com/influxdata/influxdb-client-go/v2 v2.6.0
+	github.com/showwin/speedtest-go v1.1.4
+)
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
@@ -20,8 +24,6 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/gurkankaymak/hocon v1.2.3 // indirect
-	github.com/influxdata/influxdb-client-go/v2 v2.6.0 // indirect
 	github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/moby/sys/mount v0.2.0 // indirect

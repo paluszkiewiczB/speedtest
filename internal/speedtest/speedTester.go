@@ -3,9 +3,9 @@ package speedtest
 import (
 	"context"
 	"fmt"
+	"github.com/paluszkiewiczB/speedtest/internal/core"
 	"github.com/showwin/speedtest-go/speedtest"
 	"log"
-	"speedtestMonitoring/core"
 	"time"
 )
 
