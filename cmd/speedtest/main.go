@@ -7,9 +7,11 @@ import (
 	"github.com/paluszkiewiczB/speedtest/internal/core"
 	"github.com/paluszkiewiczB/speedtest/internal/influx"
 	"github.com/paluszkiewiczB/speedtest/internal/inmemory"
+	"github.com/paluszkiewiczB/speedtest/internal/ookla"
 	"github.com/paluszkiewiczB/speedtest/internal/schedule"
-	"github.com/paluszkiewiczB/speedtest/internal/speedtest"
 	"log"
+	"os"
+	"os/signal"
 	"time"
 )
 
@@ -24,54 +26,23 @@ func main() {
 		log.Fatalf("Could not parse speed test cfg: %v\n", err)
 	}
 
-	ctx := context.TODO()
-	tester := speedtest.NewOnlineSpeedTester()
+	tester := ookla.Logging(ookla.NewSpeedTester())
 	storage, err := createStorage(cfg.GetConfig("storage"))
 	if err != nil {
 		log.Fatalf("Could not create storage: %v\n", err)
 	}
-
-	speeds := make(chan core.Speed)
-	speedErrors := make(chan error)
-	defer close(speeds)
-	defer close(speedErrors)
 	scheduler := schedule.NewScheduler()
-	defer func(scheduler schedule.Scheduler) {
-		err := scheduler.Close()
-		if err != nil {
-			log.Printf("error when closing scheduler: %v", err)
-		}
-	}(scheduler)
-	err = scheduler.Schedule(ctx, "speedtest", stc.schedulerCfg.duration, func() {
-		s, err := tester.Test(ctx)
-		if err != nil {
-			speedErrors <- err
-			return
-		}
-		speeds <- s
-	})
-	if err != nil {
-		log.Fatalf("could not schedule task for speedtest")
-	}
 
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	shutdownC := make(chan os.Signal, 1)
+	signal.Notify(shutdownC, os.Interrupt)
 	go func() {
-		for err := range speedErrors {
-			log.Printf("error during speed test: %v", err)
-		}
+		<-shutdownC
+		cancelFunc()
 	}()
 
-	for {
-		select {
-		case s := <-speeds:
-			log.Printf("speedtest result: %v", s)
-			err := storage.Push(ctx, s)
-			if err != nil {
-				log.Printf("error when storing speedtest result: %v", err)
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
+	bootCfg := core.Config{SpeedTestInterval: stc.schedulerCfg.duration}
+	core.Boot(ctx, bootCfg, scheduler, tester, storage)
 }
 
 func createStorage(config *hocon.Config) (core.Storage, error) {
@@ -101,13 +72,13 @@ type speedTestCfg struct {
 }
 
 func parseSpeedTestCfg(config *hocon.Config) (*speedTestCfg, error) {
-	schedCfg, err := parseSchedulerCfg(config.GetConfig("scheduler"))
+	sCfg, err := parseSchedulerCfg(config.GetConfig("scheduler"))
 	if err != nil {
 		return nil, err
 	}
 
 	return &speedTestCfg{
-		schedulerCfg: schedCfg,
+		schedulerCfg: sCfg,
 	}, nil
 }
 

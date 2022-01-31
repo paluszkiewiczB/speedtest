@@ -3,9 +3,11 @@ module github.com/paluszkiewiczB/speedtest
 go 1.17
 
 require (
+	github.com/google/uuid v1.3.0
 	github.com/gurkankaymak/hocon v1.2.3
 	github.com/influxdata/influxdb-client-go/v2 v2.6.0
 	github.com/showwin/speedtest-go v1.1.4
+	github.com/testcontainers/testcontainers-go v0.12.0
 )
 
 require (
@@ -23,7 +25,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/influxdata/line-protocol v0.0.0-20200327222509-2487e7298839 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/moby/sys/mount v0.2.0 // indirect
@@ -35,7 +36,6 @@ require (
 	github.com/opencontainers/runc v1.0.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/testcontainers/testcontainers-go v0.12.0 // indirect
 	go.opencensus.io v0.22.3 // indirect
 	golang.org/x/net v0.0.0-20211108170745-6635138e15ea // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect

@@ -8,24 +8,18 @@ import (
 	"time"
 )
 
-type Scheduler interface {
-	Schedule(ctx context.Context, key string, d time.Duration, task func()) error
-	Cancel(key string) error
-	Close() error
-}
-
-func NewScheduler() Scheduler {
+func NewScheduler() *Scheduler {
 	m := make(map[string]*scheduledTask)
 	mu := &sync.Mutex{}
-	return &scheduler{m, mu}
+	return &Scheduler{m, mu}
 }
 
-type scheduler struct {
+type Scheduler struct {
 	cancels map[string]*scheduledTask
 	mu      *sync.Mutex
 }
 
-func (s *scheduler) Schedule(ctx context.Context, key string, d time.Duration, task func()) error {
+func (s *Scheduler) Schedule(ctx context.Context, key string, d time.Duration, task func()) error {
 	cancel := make(chan struct{})
 	ticker := time.NewTicker(d)
 	scheduled := &scheduledTask{cancel, ticker}
@@ -34,7 +28,7 @@ func (s *scheduler) Schedule(ctx context.Context, key string, d time.Duration, t
 		return err
 	}
 	go func() {
-		log.Printf("Starting task: %s", key)
+		log.Printf("starting task: %s", key)
 		task()
 
 		for {
@@ -44,18 +38,18 @@ func (s *scheduler) Schedule(ctx context.Context, key string, d time.Duration, t
 			case <-cancel:
 				return
 			case <-ticker.C:
-				log.Printf("Starting task: %s", key)
+				log.Printf("starting task: %s", key)
 				task()
 			}
 		}
 	}()
-	log.Printf("Scheduled task %s\n", key)
+	log.Printf("scheduled task %s\n", key)
 	return nil
 }
 
 // Cancel cancels scheduled task
 // Calling Cancel second time is no-op
-func (s *scheduler) Cancel(key string) error {
+func (s *Scheduler) Cancel(key string) error {
 	s.mu.Lock()
 	c, ok := s.cancels[key]
 	s.cancels[key] = nil
@@ -67,9 +61,9 @@ func (s *scheduler) Cancel(key string) error {
 	return nil
 }
 
-// Close closes scheduler - scheduling new task after Close was called causes panic
+// Close closes Scheduler - scheduling new task after Close was called causes panic
 // Calling Close second time is no-op
-func (s *scheduler) Close() error {
+func (s *Scheduler) Close() error {
 	s.mu.Lock()
 	for _, t := range s.cancels {
 		t.cancel <- struct{}{}
@@ -80,7 +74,7 @@ func (s *scheduler) Close() error {
 	return nil
 }
 
-func (s *scheduler) putCancel(key string, task *scheduledTask) error {
+func (s *Scheduler) putCancel(key string, task *scheduledTask) error {
 	s.mu.Lock()
 	_, exists := s.cancels[key]
 	if exists {
