@@ -1,4 +1,4 @@
-package influx
+package influx_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/paluszkiewiczB/speedtest/internal/core"
+	"github.com/paluszkiewiczB/speedtest/internal/influx"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"strconv"
@@ -49,7 +50,7 @@ func TestInflux_Push(t *testing.T) {
 	mP := ports[mappedPort][0]
 	url := fmt.Sprintf("http://%s:%s", mP.HostIP, strings.Split(mP.HostPort, "/")[0])
 	fmt.Printf("InfluxDB url: %s\n", url)
-	client, err := NewClient(Cfg{
+	client, err := influx.NewClient(influx.Cfg{
 		Url:          url,
 		Token:        token,
 		Organization: org,
