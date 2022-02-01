@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/gurkankaymak/hocon"
 	"github.com/paluszkiewiczB/speedtest/internal/core"
+	"github.com/paluszkiewiczB/speedtest/internal/errHandlers"
 	"github.com/paluszkiewiczB/speedtest/internal/influx"
 	"github.com/paluszkiewiczB/speedtest/internal/inmemory"
 	"github.com/paluszkiewiczB/speedtest/internal/ookla"
@@ -27,10 +29,12 @@ func main() {
 	}
 
 	tester := ookla.Logging(ookla.NewSpeedTester())
+	log.Printf("speed tester created, creating storage")
 	storage, err := createStorage(cfg.GetConfig("storage"))
 	if err != nil {
 		log.Fatalf("Could not create storage: %v\n", err)
 	}
+
 	scheduler := schedule.NewScheduler()
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -42,7 +46,12 @@ func main() {
 	}()
 
 	bootCfg := core.Config{SpeedTestInterval: stc.schedulerCfg.duration}
-	core.Boot(ctx, bootCfg, scheduler, tester, storage)
+
+	handler := errHandlers.NewPrintln()
+	err = core.Boot(ctx, bootCfg, scheduler, tester, storage, handler)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func createStorage(config *hocon.Config) (core.Storage, error) {
@@ -87,5 +96,25 @@ type schedulerCfg struct {
 }
 
 func parseSchedulerCfg(cfg *hocon.Config) (*schedulerCfg, error) {
-	return &schedulerCfg{duration: cfg.GetDuration("duration")}, nil
+	duration, err := parseDuration(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &schedulerCfg{duration: duration}, nil
+}
+
+func parseDuration(cfg *hocon.Config) (time.Duration, error) {
+	duration := cfg.Get("duration")
+	switch d := duration.(type) {
+	case hocon.String:
+		cheat, err := hocon.ParseString(fmt.Sprintf("duration: %s", d))
+		if err != nil {
+			return -1, err
+		}
+		return cheat.GetDuration("duration"), nil
+	case hocon.Duration:
+		return cfg.GetDuration("duration"), nil
+	}
+
+	return -1, errors.New("unsupported value type of duration")
 }
