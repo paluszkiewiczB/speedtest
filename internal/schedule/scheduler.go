@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -9,9 +10,9 @@ import (
 )
 
 func NewScheduler() *Scheduler {
-	m := make(map[string]*scheduledTask)
+	c := make(map[string]*scheduledTask)
 	mu := &sync.Mutex{}
-	return &Scheduler{m, mu}
+	return &Scheduler{cancels: c, mu: mu}
 }
 
 type Scheduler struct {
@@ -20,11 +21,16 @@ type Scheduler struct {
 }
 
 func (s *Scheduler) Schedule(ctx context.Context, key string, d time.Duration, task func()) error {
-	cancel := make(chan struct{})
+	if s.cancels == nil {
+		return errors.New("scheduler was not properly initialized or is closed")
+	}
+
+	taskCtx, cancel := context.WithCancel(ctx)
 	ticker := time.NewTicker(d)
-	scheduled := &scheduledTask{cancel, ticker}
+	scheduled := &scheduledTask{cancel: cancel, ticker: ticker}
 	err := s.putCancel(key, scheduled)
 	if err != nil {
+		ticker.Stop()
 		return err
 	}
 	go func() {
@@ -33,9 +39,12 @@ func (s *Scheduler) Schedule(ctx context.Context, key string, d time.Duration, t
 
 		for {
 			select {
-			case <-ctx.Done():
-				return
-			case <-cancel:
+			case <-taskCtx.Done():
+				log.Printf("context for task: %s was cancelled", key)
+				err := s.Cancel(key)
+				if err != nil {
+					log.Printf("error when removing task")
+				}
 				return
 			case <-ticker.C:
 				log.Printf("starting task: %s", key)
@@ -43,7 +52,7 @@ func (s *Scheduler) Schedule(ctx context.Context, key string, d time.Duration, t
 			}
 		}
 	}()
-	log.Printf("scheduled task %s\n", key)
+	log.Printf("scheduled task %s", key)
 	return nil
 }
 
@@ -52,12 +61,13 @@ func (s *Scheduler) Schedule(ctx context.Context, key string, d time.Duration, t
 func (s *Scheduler) Cancel(key string) error {
 	s.mu.Lock()
 	c, ok := s.cancels[key]
-	s.cancels[key] = nil
+	delete(s.cancels, key)
 	s.mu.Unlock()
 	if ok {
-		c.cancel <- struct{}{}
+		c.cancel()
 		c.ticker.Stop()
 	}
+	log.Printf("task cancelled: %s", key)
 	return nil
 }
 
@@ -65,9 +75,9 @@ func (s *Scheduler) Cancel(key string) error {
 // Calling Close second time is no-op
 func (s *Scheduler) Close() error {
 	s.mu.Lock()
-	for _, t := range s.cancels {
-		t.cancel <- struct{}{}
-		t.ticker.Stop()
+	for _, c := range s.cancels {
+		c.ticker.Stop()
+		c.cancel()
 	}
 	s.cancels = nil
 	s.mu.Unlock()
@@ -86,6 +96,6 @@ func (s *Scheduler) putCancel(key string, task *scheduledTask) error {
 }
 
 type scheduledTask struct {
-	cancel chan<- struct{}
+	cancel func()
 	ticker *time.Ticker
 }

@@ -2,10 +2,11 @@ package core
 
 import (
 	"context"
+	"errors"
 	"log"
 )
 
-func Boot(ctx context.Context, cfg Config, scheduler Scheduler, tester SpeedTester, storage Storage) {
+func Boot(ctx context.Context, cfg Config, scheduler Scheduler, tester SpeedTester, storage Storage, errH ErrorHandler) error {
 	defer func() {
 		err := scheduler.Close()
 		if err != nil {
@@ -16,8 +17,7 @@ func Boot(ctx context.Context, cfg Config, scheduler Scheduler, tester SpeedTest
 	speedC := make(chan Speed)
 	testErrC := make(chan error)
 	defer close(speedC)
-	defer close(testErrC)
-	logErrors(testErrC)
+	handleErrors(testErrC, errH)
 
 	err := scheduler.Schedule(ctx, "SpeedTest", cfg.SpeedTestInterval, func() {
 		s, err := tester.Test(ctx)
@@ -28,27 +28,27 @@ func Boot(ctx context.Context, cfg Config, scheduler Scheduler, tester SpeedTest
 		speedC <- s
 	})
 	if err != nil {
-		log.Fatalf("could not schedule task for speedtest")
+		return errors.New("could not schedule task for speedtest")
 	}
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Context cancelled, exiting")
-			return
+			log.Println("context cancelled, exiting")
+			return nil
 		case s := <-speedC:
 			log.Printf("speedtest result: %v", s)
 			err := storage.Push(ctx, s)
 			if err != nil {
-				log.Printf("error when storing speedtest result: %v", err)
+				testErrC <- err
 			}
 		}
 	}
 }
 
-func logErrors(c chan error) {
+func handleErrors(c chan error, h ErrorHandler) {
 	go func() {
 		for err := range c {
-			log.Printf("Speedtest error: %v\n", err)
+			h.Handle(err)
 		}
 	}()
 }

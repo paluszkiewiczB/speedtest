@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/paluszkiewiczB/speedtest/internal/core"
 	"github.com/paluszkiewiczB/speedtest/internal/influx"
@@ -79,7 +80,7 @@ func TestInflux_Push(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !speed.Equals(&read) {
+	if cmp.Diff(speed, read) != "" {
 		t.Fatalf("read speed differs from written one. expected: %v, actual: %v", speed, read)
 	}
 }

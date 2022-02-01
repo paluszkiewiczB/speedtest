@@ -14,13 +14,6 @@ type Speed struct {
 	Timestamp time.Time
 }
 
-func (s *Speed) Equals(other *Speed) bool {
-	return s.Download == other.Download &&
-		s.Upload == other.Upload &&
-		s.Ping == other.Ping &&
-		s.Timestamp.Equal(other.Timestamp)
-}
-
 type Storage interface {
 	Push(ctx context.Context, speed Speed) error
 	Close() error
@@ -34,6 +27,10 @@ type Scheduler interface {
 	Schedule(ctx context.Context, key string, d time.Duration, task func()) error
 	Cancel(key string) error
 	Close() error
+}
+
+type ErrorHandler interface {
+	Handle(err error)
 }
 
 type Config struct {
