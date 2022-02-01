@@ -9,9 +9,9 @@ import (
 )
 
 func NewScheduler() *Scheduler {
-	m := make(map[string]*scheduledTask)
+	c := make(map[string]*scheduledTask)
 	mu := &sync.Mutex{}
-	return &Scheduler{m, mu}
+	return &Scheduler{cancels: c, mu: mu}
 }
 
 type Scheduler struct {
@@ -22,9 +22,10 @@ type Scheduler struct {
 func (s *Scheduler) Schedule(ctx context.Context, key string, d time.Duration, task func()) error {
 	cancel := make(chan struct{})
 	ticker := time.NewTicker(d)
-	scheduled := &scheduledTask{cancel, ticker}
+	scheduled := &scheduledTask{cancel: cancel, ticker: ticker}
 	err := s.putCancel(key, scheduled)
 	if err != nil {
+		ticker.Stop()
 		return err
 	}
 	go func() {
@@ -34,8 +35,10 @@ func (s *Scheduler) Schedule(ctx context.Context, key string, d time.Duration, t
 		for {
 			select {
 			case <-ctx.Done():
+				log.Printf("context for task: %s was cancelled", key)
 				return
 			case <-cancel:
+				log.Printf("task: %s was cancelled manually", key)
 				return
 			case <-ticker.C:
 				log.Printf("starting task: %s", key)
@@ -65,9 +68,10 @@ func (s *Scheduler) Cancel(key string) error {
 // Calling Close second time is no-op
 func (s *Scheduler) Close() error {
 	s.mu.Lock()
-	for _, t := range s.cancels {
-		t.cancel <- struct{}{}
-		t.ticker.Stop()
+	for _, c := range s.cancels {
+		c.ticker.Stop()
+		//FIXME it causes app to hang or deadlock??
+		//c.cancel <- struct{}{}
 	}
 	s.cancels = nil
 	s.mu.Unlock()

@@ -33,7 +33,7 @@ func Boot(ctx context.Context, cfg Config, scheduler Scheduler, tester SpeedTest
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Context cancelled, exiting")
+			log.Println("context cancelled, exiting")
 			return
 		case s := <-speedC:
 			log.Printf("speedtest result: %v", s)
@@ -48,7 +48,7 @@ func Boot(ctx context.Context, cfg Config, scheduler Scheduler, tester SpeedTest
 func logErrors(c chan error) {
 	go func() {
 		for err := range c {
-			log.Printf("Speedtest error: %v\n", err)
+			log.Printf("speedtest error: %v\n", err)
 		}
 	}()
 }
