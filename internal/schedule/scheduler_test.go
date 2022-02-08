@@ -7,7 +7,8 @@ import (
 	"time"
 )
 
-// FIXME flaky test
+// FIXME flaky tests :(
+
 func Test_CancellingContextShouldStopTask(t *testing.T) {
 	scheduler := schedule.NewScheduler()
 	timeout, cancel := context.WithCancel(context.Background())
