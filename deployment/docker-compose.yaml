@@ -1,0 +1,44 @@
+version: '3'
+services:
+  speedtest:
+    build: ..
+    image: speedtest:latest
+    ports:
+      - "2112:2112"
+    environment:
+      - STORAGE_TYPE=influx
+      - INFLUX_HOST=http://influxdb
+      - INFLUX_PORT=8086
+      - INFLUX_TOKEN=Adm!nT0k3N # here should be API token with allowing to write to only one bucket
+      - INFLUX_BUCKET=speedtest-results
+      - INFLUX_ORG=speedtest
+      - SCHEDULER_DURATION=1 second
+    networks:
+      - speedtestN
+  influxdb:
+    image: influxdb:latest
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=speedtest-app
+      - DOCKER_INFLUXDB_INIT_PASSWORD=P@s5w0rD
+      - DOCKER_INFLUXDB_INIT_ORG=speedtest
+      - DOCKER_INFLUXDB_INIT_BUCKET=speedtest-results
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=Adm!nT0k3N
+    volumes:
+      - influxdbV
+    networks:
+      - speedtestN
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    networks:
+      - speedtestN
+volumes:
+  influxdbV:
+networks:
+  speedtestN:

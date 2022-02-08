@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"github.com/gurkankaymak/hocon"
 	"github.com/paluszkiewiczB/speedtest/internal/core"
+	"github.com/paluszkiewiczB/speedtest/internal/dummy"
 	"github.com/paluszkiewiczB/speedtest/internal/errHandlers"
 	"github.com/paluszkiewiczB/speedtest/internal/influx"
 	"github.com/paluszkiewiczB/speedtest/internal/inmemory"
+	"github.com/paluszkiewiczB/speedtest/internal/observe"
 	"github.com/paluszkiewiczB/speedtest/internal/ookla"
 	"github.com/paluszkiewiczB/speedtest/internal/schedule"
 	"log"
@@ -20,19 +22,22 @@ import (
 func main() {
 	cfg, err := hocon.ParseResource("reference.conf")
 	if err != nil {
-		log.Fatalf("Could not parse config: %v\n", err)
+		log.Fatalf("could not parse config: %v\n", err)
 		return
 	}
 	stc, err := parseSpeedTestCfg(cfg.GetConfig("speedtest"))
 	if err != nil {
-		log.Fatalf("Could not parse speed test cfg: %v\n", err)
+		log.Fatalf("could not parse speed test cfg: %v\n", err)
 	}
 
-	tester := ookla.Logging(ookla.NewSpeedTester())
-	log.Printf("speed tester created, creating storage")
+	tester, err := createSpeedTester(stc.clientCfg)
+	if err != nil {
+		log.Fatalf("could not create speed tester: %v", err)
+	}
+
 	storage, err := createStorage(cfg.GetConfig("storage"))
 	if err != nil {
-		log.Fatalf("Could not create storage: %v\n", err)
+		log.Fatalf("could not create storage: %v\n", err)
 	}
 
 	scheduler := schedule.NewScheduler()
@@ -45,12 +50,40 @@ func main() {
 		cancelFunc()
 	}()
 
-	bootCfg := core.Config{SpeedTestInterval: stc.schedulerCfg.duration}
+	promCfg := parsePrometheusCfg(cfg)
+	if promCfg.enabled {
+		observe.ExposePrometheus(ctx, promCfg.cfg)
+		storage = observe.Storage(storage)
+	}
 
 	handler := errHandlers.NewPrintln()
+	bootCfg := core.Config{SpeedTestInterval: stc.schedulerCfg.duration}
 	err = core.Boot(ctx, bootCfg, scheduler, tester, storage, handler)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+type prometheusCfg struct {
+	enabled bool
+	cfg     observe.PrometheusConfig
+}
+
+func parsePrometheusCfg(config *hocon.Config) prometheusCfg {
+	pCfg := config.GetConfig("prometheus")
+	enabled := pCfg.GetBoolean("enabled")
+	if !enabled {
+		return prometheusCfg{enabled: false}
+	}
+
+	cfg := observe.PrometheusConfig{
+		Endpoint: pCfg.GetString("endpoint"),
+		Port:     pCfg.GetInt("port"),
+	}
+
+	return prometheusCfg{
+		enabled: true,
+		cfg:     cfg,
 	}
 }
 
@@ -78,6 +111,7 @@ func parseInfluxStorageCfg(config *hocon.Config) (influx.Cfg, error) {
 
 type speedTestCfg struct {
 	schedulerCfg *schedulerCfg
+	clientCfg    *clientCfg
 }
 
 func parseSpeedTestCfg(config *hocon.Config) (*speedTestCfg, error) {
@@ -86,8 +120,14 @@ func parseSpeedTestCfg(config *hocon.Config) (*speedTestCfg, error) {
 		return nil, err
 	}
 
+	cCfg, err := parseClientCfg(config.GetConfig("client"))
+	if err != nil {
+		return nil, err
+	}
+
 	return &speedTestCfg{
 		schedulerCfg: sCfg,
+		clientCfg:    cCfg,
 	}, nil
 }
 
@@ -117,4 +157,25 @@ func parseDuration(cfg *hocon.Config) (time.Duration, error) {
 	}
 
 	return -1, errors.New("unsupported value type of duration")
+}
+
+type clientCfg struct {
+	clientType string
+}
+
+func parseClientCfg(cfg *hocon.Config) (*clientCfg, error) {
+	return &clientCfg{clientType: cfg.GetString("type")}, nil
+}
+
+func createSpeedTester(cfg *clientCfg) (core.SpeedTester, error) {
+	switch cfg.clientType {
+	case "OOKLA":
+		return ookla.NewSpeedTester(), nil
+	case "OOKLA_LOGGING":
+		return ookla.Logging(ookla.NewSpeedTester()), nil
+	case "DUMMY":
+		return &dummy.SpeedTester{}, nil
+	}
+
+	return nil, fmt.Errorf("unsupported speed tester type: %s", cfg.clientType)
 }

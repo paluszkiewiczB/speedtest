@@ -6,43 +6,45 @@ import (
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/paluszkiewiczB/speedtest/internal/core"
+	"log"
 	"time"
 )
 
-func NewClient(cfg Cfg) (core.Storage, error) {
+func NewClient(cfg Cfg) (*Client, error) {
 	c := influxdb2.NewClient(cfg.Url, cfg.Token)
 	err := testConnection(c)
 	if err != nil {
 		return nil, err
 	}
 	w := c.WriteAPI(cfg.Organization, cfg.Bucket)
-	return &influx{writer: w, client: c, organization: cfg.Organization, bucket: cfg.Bucket}, nil
+	return &Client{writer: w, client: c, organization: cfg.Organization, bucket: cfg.Bucket}, nil
 }
 
 type Cfg struct {
 	Url, Token, Organization, Bucket string
 }
 
-type influx struct {
+type Client struct {
 	client               influxdb2.Client
 	writer               api.WriteAPI
 	organization, bucket string
 }
 
 func testConnection(c influxdb2.Client) error {
+	log.Println("testing connection to influxdb")
 	timeout, cancelTimeout := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancelTimeout()
 	ticker := time.NewTicker(time.Second * 1)
 	eC := make(chan error, 1)
 	go func() {
 		ping := func() {
-			fmt.Printf("Pinging...\n")
+			log.Println("pinging influxdb...")
 			ok, err := c.Ping(timeout)
 			if ok && err == nil {
-				println("Connection obtained")
+				log.Println("influxdb connection obtained")
 				eC <- nil
 			} else {
-				fmt.Printf("error pinging: %v\n", err)
+				log.Printf("error pinging: %v\n", err)
 			}
 		}
 
@@ -52,7 +54,7 @@ func testConnection(c influxdb2.Client) error {
 			case <-ticker.C:
 				ping()
 			case <-timeout.Done():
-				eC <- timeoutErr("pinging influxdb when to test connection")
+				eC <- timeoutErr("pinging influxdb to test connection")
 			}
 		}
 
@@ -61,7 +63,7 @@ func testConnection(c influxdb2.Client) error {
 }
 
 // Push TODO configurable measurements and tags?
-func (db *influx) Push(ctx context.Context, speed core.Speed) error {
+func (c *Client) Push(ctx context.Context, speed core.Speed) error {
 	eC := make(chan error, 1)
 	go func() {
 		measurement := "speedtest"
@@ -75,8 +77,8 @@ func (db *influx) Push(ctx context.Context, speed core.Speed) error {
 			"ping":     speed.Ping,
 		}
 		p := influxdb2.NewPoint(measurement, tags, fields, speed.Timestamp)
-		fmt.Printf("Writing point at: %v", speed.Timestamp)
-		db.writer.WritePoint(p)
+		log.Printf("Writing point at: %v", speed.Timestamp)
+		c.writer.WritePoint(p)
 		eC <- nil
 	}()
 
@@ -89,9 +91,9 @@ func (db *influx) Push(ctx context.Context, speed core.Speed) error {
 
 }
 
-func (db *influx) Close() error {
-	db.writer.Flush()
-	db.client.Close()
+func (c *Client) Close() error {
+	c.writer.Flush()
+	c.client.Close()
 	return nil
 }
 
