@@ -11,7 +11,7 @@ COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
-COPY cmd/speedtest/reference.conf reference.conf
+COPY cmd/speedtest/reference_env_walkaround.conf reference.conf
 COPY --from=builder /build/cmd/speedtest/speedtest speedtest
 
 USER app

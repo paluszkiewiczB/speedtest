@@ -15,7 +15,11 @@ func Test_Boot(t *testing.T) {
 	storage := newInMemoryStorage()
 
 	handler := &countingHandler{}
-	err := core.Boot(ctx, core.Config{SpeedTestInterval: 1 * time.Hour}, schedule.NewScheduler(), &dummyTester{}, storage, handler)
+	scheduler := schedule.NewScheduler()
+	t.Cleanup(func() {
+		_ = scheduler.Close()
+	})
+	err := core.Boot(ctx, core.Config{SpeedTestInterval: 1 * time.Hour}, scheduler, &dummyTester{}, storage, handler)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +59,11 @@ func Test_BootWithTestErrors(t *testing.T) {
 	storage := newInMemoryStorage()
 
 	handler := &countingHandler{}
-	err := core.Boot(ctx, core.Config{SpeedTestInterval: 1 * time.Hour}, schedule.NewScheduler(), &failingTester{}, storage, handler)
+	scheduler := schedule.NewScheduler()
+	t.Cleanup(func() {
+		_ = scheduler.Close
+	})
+	err := core.Boot(ctx, core.Config{SpeedTestInterval: 1 * time.Hour}, scheduler, &failingTester{}, storage, handler)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +84,11 @@ func Test_BootWithSaveErrors(t *testing.T) {
 	storage := &failingStorage{}
 
 	handler := &countingHandler{}
-	err := core.Boot(ctx, core.Config{SpeedTestInterval: 1 * time.Hour}, schedule.NewScheduler(), &dummyTester{}, storage, handler)
+	scheduler := schedule.NewScheduler()
+	t.Cleanup(func() {
+		_ = scheduler.Close
+	})
+	err := core.Boot(ctx, core.Config{SpeedTestInterval: 1 * time.Hour}, scheduler, &dummyTester{}, storage, handler)
 	if err != nil {
 		t.Fatal(err)
 	}

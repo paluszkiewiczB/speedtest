@@ -88,6 +88,7 @@ func (s *Scheduler) putCancel(key string, task *scheduledTask) error {
 	s.mu.Lock()
 	_, exists := s.cancels[key]
 	if exists {
+		s.mu.Unlock()
 		return fmt.Errorf("task with key: %s is already scheduled", key)
 	}
 	s.cancels[key] = task

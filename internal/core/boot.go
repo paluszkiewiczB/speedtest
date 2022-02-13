@@ -7,16 +7,16 @@ import (
 )
 
 func Boot(ctx context.Context, cfg Config, scheduler Scheduler, tester SpeedTester, storage Storage, errH ErrorHandler) error {
+	speedC := make(chan Speed)
+	testErrC := make(chan error)
 	defer func() {
 		err := scheduler.Close()
 		if err != nil {
 			log.Printf("error when closing scheduler: %v", err)
 		}
+		close(testErrC)
+		close(speedC)
 	}()
-
-	speedC := make(chan Speed)
-	testErrC := make(chan error)
-	defer close(speedC)
 	handleErrors(testErrC, errH)
 
 	err := scheduler.Schedule(ctx, "SpeedTest", cfg.SpeedTestInterval, func() {

@@ -6,7 +6,7 @@ services:
     ports:
       - "2112:2112"
     environment:
-      - STORAGE_TYPE=influx
+      - STORAGE_TYPE=INFLUX
       - INFLUX_HOST=http://influxdb
       - INFLUX_PORT=8086
       - INFLUX_TOKEN=Adm!nT0k3N # here should be API token with allowing to write to only one bucket

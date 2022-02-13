@@ -11,11 +11,14 @@ import (
 
 func Test_CancellingContextShouldStopTask(t *testing.T) {
 	scheduler := schedule.NewScheduler()
+	t.Cleanup(func() {
+		_ = scheduler.Close()
+	})
 	timeout, cancel := context.WithCancel(context.Background())
 	stopCounting := time.NewTimer(3 * time.Millisecond)
 
 	task := &limitTask{t: &testTask{}, limit: 2, cancel: cancel}
-	err := scheduler.Schedule(timeout, "test", 1*time.Millisecond, task.inc)
+	err := scheduler.Schedule(timeout, "Test_CancellingContextShouldStopTask", 1*time.Millisecond, task.inc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,16 +30,20 @@ func Test_CancellingContextShouldStopTask(t *testing.T) {
 
 func TestScheduler_Cancel(t *testing.T) {
 	scheduler := schedule.NewScheduler()
-	cancelContext := time.NewTimer(1100 * time.Microsecond)
+	t.Cleanup(func() {
+		_ = scheduler.Close()
+	})
+
+	cancelContext := time.NewTimer(1001 * time.Microsecond)
 	stopCounting := time.NewTimer(3 * time.Millisecond)
 	go func() {
 		<-cancelContext.C
-		_ = scheduler.Cancel("test")
-		_ = scheduler.Cancel("test")
-		_ = scheduler.Cancel("test")
+		_ = scheduler.Cancel("TestScheduler_Cancel")
+		_ = scheduler.Cancel("TestScheduler_Cancel")
+		_ = scheduler.Cancel("TestScheduler_Cancel")
 	}()
 	task := &testTask{}
-	err := scheduler.Schedule(context.Background(), "test", 1*time.Millisecond, task.inc)
+	err := scheduler.Schedule(context.Background(), "TestScheduler_Cancel", 1*time.Millisecond, task.inc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,12 +56,16 @@ func TestScheduler_Cancel(t *testing.T) {
 
 func TestScheduler_ScheduleAfterClose(t *testing.T) {
 	scheduler := schedule.NewScheduler()
+	t.Cleanup(func() {
+		_ = scheduler.Close()
+	})
+
 	err := scheduler.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	err = scheduler.Schedule(ctx, "should fal", 1*time.Hour, func() {
+	err = scheduler.Schedule(ctx, "TestScheduler_ScheduleAfterClose", 1*time.Hour, func() {
 		panic("should never happen")
 	})
 
@@ -65,15 +76,20 @@ func TestScheduler_ScheduleAfterClose(t *testing.T) {
 
 func Test_SchedulerDuplicate(t *testing.T) {
 	scheduler := schedule.NewScheduler()
+	t.Cleanup(func() {
+		_ = scheduler.Close()
+	})
+
 	task := &testTask{}
-	err := scheduler.Schedule(context.Background(), "test", 1*time.Millisecond, task.inc)
+	err := scheduler.Schedule(context.Background(), "Test_SchedulerDuplicate", 1*time.Millisecond, task.inc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = scheduler.Schedule(context.Background(), "test", 1*time.Millisecond, task.inc)
+	err = scheduler.Schedule(context.Background(), "Test_SchedulerDuplicate", 1*time.Millisecond, task.inc)
 	if err == nil {
 		t.Fatal("expected error, but it's nil")
 	}
+	scheduler.Close()
 }
 
 type testTask struct {
