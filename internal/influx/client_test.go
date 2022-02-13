@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	username   = "username"
-	password   = "influxdb123"
-	org        = "testOrganization"
-	bucket     = "testBucket"
-	token      = "adminToken"
-	mappedPort = "8086/tcp"
+	username    = "username"
+	password    = "influxdb123"
+	org         = "testOrganization"
+	bucket      = "testBucket"
+	token       = "adminToken"
+	mappedPort  = "8086/tcp"
+	measurement = "test"
 )
 
 var influxEnvs = map[string]string{
@@ -35,12 +36,12 @@ var influxEnvs = map[string]string{
 }
 
 func TestInflux_Push(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	ctx := context.Background()
 	container, err := prepareContainer(ctx)
 	defer terminate(container, ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,12 +52,23 @@ func TestInflux_Push(t *testing.T) {
 	mP := ports[mappedPort][0]
 	url := fmt.Sprintf("http://%s:%s", mP.HostIP, strings.Split(mP.HostPort, "/")[0])
 	fmt.Printf("InfluxDB url: %s\n", url)
-	client, err := influx.NewClient(influx.Cfg{
+	asyncClient, err := influx.NewClient(influx.Cfg{
 		Url:          url,
 		Token:        token,
 		Organization: org,
 		Bucket:       bucket,
+		Points: influx.PointsCfg{
+			Measurement: measurement,
+			Tags: map[string]string{
+				"key": "value",
+			},
+		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := influx.Retrying(asyncClient, influx.RetryCfg{Times: 20, Wait: 100 * time.Millisecond})
+	err = client.Ping(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,8 +126,8 @@ func readSpeed(ctx context.Context, url string) (core.Speed, error) {
 	query := fmt.Sprintf(
 		`	from(bucket:"%s")
 					|> range(start: -1h)
-					|> filter(fn: (r) =>r._measurement == "speedtest")
-					|> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")`, bucket)
+					|> filter(fn: (r) =>r._measurement == "%s")
+					|> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")`, bucket, measurement)
 	result, err := influxdb2.NewClient(url, token).QueryAPI(org).Query(ctx, query)
 	if err != nil {
 		return core.InvalidSpeed, err
@@ -129,7 +141,7 @@ func readSpeed(ctx context.Context, url string) (core.Speed, error) {
 	return core.Speed{
 		Download:  toFloat(r.ValueByKey("download")),
 		Upload:    toFloat(r.ValueByKey("upload")),
-		Ping:      toDuration(r.ValueByKey("ping")),
+		Ping:      time.Duration(toInt(r.ValueByKey("ping")) * time.Millisecond.Nanoseconds()),
 		Timestamp: r.Time(),
 	}, nil
 }
@@ -145,17 +157,19 @@ func toFloat(f interface{}) float64 {
 		}
 		return float
 	}
-	panic("not supported type")
+	panic(fmt.Sprintf("cannot parse to float: %v", f))
 }
 
-func toDuration(d interface{}) time.Duration {
-	if s, ok := d.(string); ok {
-		duration, err := time.ParseDuration(s)
+func toInt(f interface{}) int64 {
+	if r, ok := f.(int64); ok {
+		return r
+	}
+	if s, ok := f.(string); ok {
+		parsed, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			panic(err)
 		}
-		return duration
+		return parsed
 	}
-
-	panic("not supported type")
+	panic(fmt.Sprintf("cannot parse to int64: %v", f))
 }

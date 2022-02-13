@@ -14,7 +14,7 @@ func ExposePrometheus(ctx context.Context, cfg PrometheusConfig) {
 	go func() {
 		err := server.ListenAndServe()
 		if err != nil {
-			log.Println("could not start prometheus server!")
+			log.Printf("could not start prometheus server: %s\n", err)
 		}
 	}()
 
